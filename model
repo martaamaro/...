@@ -1,0 +1,109 @@
+import numpy as np
+
+# Parameters
+num_floors = 8
+elevator_speed = 2  # time to move between floors (in seconds)
+stop_time = 10  # time to stop at each floor (in seconds)
+simulation_time = 3600  # simulate for 3600 seconds
+arrival_rate = [0.01, 0.03, 0.06, 0.09, 0.11, 0.13, 0.16, 0.19]  # average arrivals per second for each floor
+elevator_capacity = 21  # maximum number of people the elevator can carry
+
+# Initialize variables
+arrival_times = {floor: [] for floor in range(num_floors)}
+waiting_times = {floor: [] for floor in range(num_floors)}
+elevator = []  # List to hold people in the elevator (their arrival times)
+elevator_floor = 0
+
+# Generate initial arrival times for each floor using Poisson and exponential distributions
+for floor in range(num_floors):
+    inter_arrival_times = np.random.exponential(1 / arrival_rate[floor], int(arrival_rate[floor] * simulation_time))
+    arrival_times[floor] = list(np.cumsum(inter_arrival_times))
+
+# Simulate elevator movement and calculate waiting times
+time = 0
+going_up = True  # Elevator direction flag
+
+while time < simulation_time:
+    # Generate new arrivals during the simulation
+    for floor in range(num_floors):
+        if np.random.rand() < arrival_rate[floor] * (1 / simulation_time):
+            if len(arrival_times[floor]) == 0 or arrival_times[floor][-1] < time:
+                arrival_times[floor].append(time)
+
+    # Update waiting times for all waiting passengers
+    for floor in range(num_floors):
+        for i in range(len(arrival_times[floor])):
+            waiting_time = time - arrival_times[floor][i]
+            if waiting_time > 0:
+                waiting_times[floor].append(waiting_time)
+
+    if going_up:
+        for floor in range(elevator_floor, num_floors):
+            time += elevator_speed
+            elevator_floor = floor
+
+            if time > simulation_time:
+                break
+
+            # Unload people at ground floor if at capacity
+            if elevator_floor == 0 and len(elevator) >= elevator_capacity:
+                elevator.clear()
+                time += stop_time
+
+            while len(arrival_times[floor]) > 0 and arrival_times[floor][0] <= time and len(elevator) < elevator_capacity:
+                arrival_time = arrival_times[floor].pop(0)
+                waiting_time = max(0, time - arrival_time)
+                waiting_times[floor].append(waiting_time)
+                elevator.append(time)
+                print(f"Picked up at floor {floor} going up, arrival time: {arrival_time}, current time: {time}, waiting time: {waiting_time}")
+
+            time += stop_time
+
+            if len(elevator) >= elevator_capacity:
+                time += elevator_speed * elevator_floor
+                elevator_floor = 0
+                elevator.clear()
+                time += stop_time
+                break
+
+            if elevator_floor == num_floors - 1:
+                going_up = False
+
+    if not going_up:
+        for floor in range(elevator_floor - 1, -1, -1):
+            time += elevator_speed
+            elevator_floor = floor
+
+            if time > simulation_time:
+                break
+
+            # Unload people at ground floor if at capacity
+            if elevator_floor == 0 and len(elevator) >= elevator_capacity:
+                elevator.clear()
+                time += stop_time
+
+            while len(arrival_times[floor]) > 0 and arrival_times[floor][0] <= time and len(elevator) < elevator_capacity:
+                arrival_time = arrival_times[floor].pop(0)
+                waiting_time = max(0, time - arrival_time)
+                waiting_times[floor].append(waiting_time)
+                elevator.append(time)
+                print(f"Picked up at floor {floor} going down, arrival time: {arrival_time}, current time: {time}, waiting time: {waiting_time}")
+
+            time += stop_time
+
+            if len(elevator) >= elevator_capacity:
+                time += elevator_speed * (elevator_floor + 1)
+                elevator_floor = 0
+                elevator.clear()
+                time += stop_time
+                break
+
+            if elevator_floor == 0:
+                going_up = True
+                break
+
+# Calculate and print average waiting times
+average_waiting_times = {floor: np.mean(waiting_times[floor]) if waiting_times[floor] else 0 for floor in range(num_floors)}
+for floor in range(num_floors):
+    print(f"Average waiting time at floor {floor}: {average_waiting_times[floor]:.2f} seconds")
+    print(waiting_times[floor])
